@@ -8,9 +8,14 @@ const PORT = process.env.PORT || 3000;
 const DATA_DIR = path.join(__dirname, 'data');
 const STORAGE_FILE = path.join(DATA_DIR, 'storage.json');
 
-// Ensure data directory exists
+// Ensure data directory exists and is accessible
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+if (fs.existsSync(STORAGE_FILE)) {
+  try {
+    fs.chmodSync(STORAGE_FILE, 0o666);
+  } catch (_) {}
 }
 
 // Initial storage seed
@@ -47,16 +52,21 @@ function readStorage() {
   }
 }
 
-// Atomic helper to write storage
+// Safe helper to write storage reliably across platforms (avoids Windows rename EPERM locking)
 function writeStorage(data) {
   try {
-    const tempFile = `${STORAGE_FILE}.tmp.${Date.now()}`;
-    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf8');
-    fs.renameSync(tempFile, STORAGE_FILE);
+    const json = JSON.stringify(data, null, 2);
+    fs.writeFileSync(STORAGE_FILE, json, { encoding: 'utf8', flag: 'w' });
     return true;
   } catch (err) {
-    console.error('Error writing storage.json:', err.message);
-    return false;
+    try {
+      fs.chmodSync(STORAGE_FILE, 0o666);
+      fs.writeFileSync(STORAGE_FILE, JSON.stringify(data, null, 2), { encoding: 'utf8', flag: 'w' });
+      return true;
+    } catch (retryErr) {
+      console.error('Error writing storage.json:', retryErr.message);
+      return false;
+    }
   }
 }
 
