@@ -16,3 +16,6 @@ Thumbs.db
 # Optional editor configuration
 .vscode/*
 !.vscode/launch.json
+
+# Runtime data files
+data/storage.json
