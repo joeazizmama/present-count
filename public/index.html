@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presence — An Ephemeral Counter & The Void</title>
+  <meta name="description" content="A luxury minimal interactive space to record your presence and cast whispers into the void.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='38' fill='none' stroke='%231a1816' stroke-width='4'/><circle cx='50' cy='50' r='6' fill='%231a1816'/></svg>">
+</head>
+<body>
+  <!-- Ambient grain and soft light vignette -->
+  <div class="ambient-glow" aria-hidden="true"></div>
+  <div class="noise-overlay" aria-hidden="true"></div>
+
+  <!-- Sound Toggle -->
+  <header class="site-header">
+    <div class="brand-monogram">P / V</div>
+    <button id="soundToggle" class="sound-toggle-btn" aria-label="Toggle ambient chime sounds" title="Toggle audio chimes">
+      <svg class="sound-icon sound-on" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+        <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+      </svg>
+      <svg class="sound-icon sound-off" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+        <line x1="23" y1="9" x2="17" y2="15"/>
+        <line x1="17" y1="9" x2="23" y2="15"/>
+      </svg>
+      <span class="sound-label">Audio</span>
+    </button>
+  </header>
+
+  <main class="viewport-stage">
+    <!-- Main Centerpiece Card -->
+    <div class="sanctuary-card">
+
+      <!-- Presence Hit Counter -->
+      <div class="presence-header">
+        <p class="counter-label" id="counterLabel">
+          <span class="label-prefix">Presence count:</span>
+          <span class="odometer-wrap" id="presenceCounter">
+            <span class="count-value" id="countDigits">—</span>
+          </span>
+        </p>
+        <div class="presence-pulse-dot" id="liveDot" title="Presence synchronized"></div>
+      </div>
+
+      <!-- Interactive Flow Container -->
+      <div class="interaction-slider" id="interactionSlider">
+
+        <!-- Stage 1: Presence View -->
+        <section class="stage stage-presence" id="stagePresence" aria-labelledby="counterLabel">
+          <div class="action-wrap">
+            <button 
+              id="presenceBtn" 
+              class="primary-btn presence-btn" 
+              type="button"
+              aria-label="Confirm presence: I Was Here"
+            >
+              <span class="btn-text">I Was Here</span>
+              <span class="ripple-host" id="rippleHost"></span>
+            </button>
+          </div>
+
+          <div class="quiet-link-wrap">
+            <button 
+              id="openSecretBtn" 
+              class="quiet-link" 
+              type="button"
+            >
+              or share an anonymous secret <span class="arrow-glyph">→</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Stage 2: Secret to the Void View -->
+        <section class="stage stage-secret is-hidden" id="stageSecret" aria-label="Share an anonymous secret">
+          <div class="secret-header-row">
+            <span class="secret-prompt">Whisper something into the unknown</span>
+            <div class="secret-header-controls">
+              <span class="secret-quota-badge" id="secretQuotaBadge">2 whispers left</span>
+              <button id="closeSecretBtn" class="secret-back-btn" type="button" aria-label="Back to presence">
+                <span>✕</span>
+              </button>
+            </div>
+          </div>
+
+          <form id="secretForm" class="secret-form" novalidate>
+            <div class="input-container">
+              <input 
+                type="text" 
+                id="secretInput" 
+                class="secret-input" 
+                placeholder="Write your secret..." 
+                maxlength="500" 
+                autocomplete="off" 
+                spellcheck="false"
+                required
+              />
+              <div class="input-line-accent"></div>
+            </div>
+
+            <div class="secret-actions">
+              <button 
+                id="voidBtn" 
+                class="primary-btn void-btn" 
+                type="submit"
+              >
+                <span class="btn-text" id="voidBtnText">Send to the Void</span>
+                <span class="btn-spinner" id="voidBtnSpinner" aria-hidden="true"></span>
+              </button>
+            </div>
+          </form>
+
+          <p class="void-disclaimer">
+            <span class="lock-glyph">✧</span> 100% Anonymous. No tracking.
+          </p>
+        </section>
+
+        <!-- Stage 3: Void Release Confirmation -->
+        <section class="stage stage-confirmation is-hidden" id="stageConfirmation" aria-live="polite">
+          <div class="void-burst-icon" id="voidBurstIcon">
+            <div class="ring ring-1"></div>
+            <div class="ring ring-2"></div>
+            <div class="ring ring-3"></div>
+            <div class="core-point"></div>
+          </div>
+          <h2 class="confirmation-title">Whispered into the void.</h2>
+          <p class="confirmation-sub">Your words have dissolved into eternal quietude.</p>
+          <button id="returnPresenceBtn" class="return-link" type="button">
+            ← Return to presence
+          </button>
+        </section>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Ambient Footer -->
+  <footer class="site-footer">
+    <div class="footer-left">
+      <span>Ephemeral Archive</span>
+    </div>
+    <div class="footer-center">
+      <span class="divider-dash">—</span>
+      <span class="coord-tag" id="timeTag">Local Quiet</span>
+      <span class="divider-dash">—</span>
+    </div>
+    <div class="footer-right">
+      <span class="void-stat" id="voidStat">Holding secrets in silence</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
