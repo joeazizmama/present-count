@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='38' fill='none' stroke='%231a1816' stroke-width='4'/><circle cx='50' cy='50' r='6' fill='%231a1816'/></svg>">
   <style>
     /* Vault-specific styling */
     .vault-layout {
@@ -512,6 +513,7 @@
         if (!isoStr) return 'Unknown date';
         try {
           const d = new Date(isoStr);
+          if (isNaN(d.getTime())) return 'Unknown date';
           return d.toLocaleDateString(undefined, {
             month: 'short',
             day: 'numeric',
@@ -520,14 +522,17 @@
             minute: '2-digit'
           });
         } catch (e) {
-          return isoStr;
+          return 'Unknown date';
         }
       }
 
       function renderFeed() {
-        const query = searchSecrets.value.trim().toLowerCase();
+        const query = (searchSecrets.value || '').trim().toLowerCase();
         const filtered = loadedSecrets.filter(s => {
-          return !query || s.text.toLowerCase().includes(query) || s.id.toLowerCase().includes(query);
+          if (!s || typeof s !== 'object') return false;
+          const text = (s.text || '').toLowerCase();
+          const id = (s.id || '').toLowerCase();
+          return !query || text.includes(query) || id.includes(query);
         });
 
         if (filtered.length === 0) {
@@ -539,26 +544,31 @@
           return;
         }
 
-        secretsFeed.innerHTML = filtered.map(item => `
-          <article class="secret-card" id="card-${item.id}">
-            <div class="secret-text">“${escapeHtml(item.text)}”</div>
+        secretsFeed.innerHTML = filtered.map(item => {
+          const safeId = escapeHtml(item.id || 'unknown');
+          const safeText = escapeHtml(item.text || '');
+          const rawTextEncoded = encodeURIComponent(item.text || '');
+          return `
+          <article class="secret-card" id="card-${safeId}">
+            <div class="secret-text">“${safeText}”</div>
             <div class="secret-meta">
               <div style="display: flex; align-items: center; gap: 0.6rem;">
-                <span class="secret-id-badge">${item.id}</span>
+                <span class="secret-id-badge">${safeId}</span>
                 <span>${formatTime(item.timestamp)}</span>
               </div>
               <div class="secret-actions-row">
-                <button class="action-icon-btn copy-btn" data-text="${encodeURIComponent(item.text)}">Copy</button>
-                <button class="action-icon-btn delete-btn" data-id="${item.id}">Dissolve</button>
+                <button class="action-icon-btn copy-btn" data-text="${rawTextEncoded}">Copy</button>
+                <button class="action-icon-btn delete-btn" data-id="${safeId}">Dissolve</button>
               </div>
             </div>
           </article>
-        `).join('');
+        `;
+        }).join('');
 
         // Attach action handlers
         secretsFeed.querySelectorAll('.copy-btn').forEach(btn => {
           btn.addEventListener('click', () => {
-            const txt = decodeURIComponent(btn.dataset.text);
+            const txt = decodeURIComponent(btn.dataset.text || '');
             navigator.clipboard.writeText(txt);
             const orig = btn.textContent;
             btn.textContent = 'Copied!';
@@ -577,7 +587,7 @@
                 headers: { 'Authorization': `Bearer ${currentToken}` }
               });
               if (res.ok) {
-                loadedSecrets = loadedSecrets.filter(s => s.id !== id);
+                loadedSecrets = loadedSecrets.filter(s => s && s.id !== id);
                 metricSecrets.textContent = loadedSecrets.length.toLocaleString();
                 renderFeed();
               }
@@ -589,7 +599,8 @@
       }
 
       function escapeHtml(str) {
-        return str
+        if (str === null || str === undefined) return '';
+        return String(str)
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')

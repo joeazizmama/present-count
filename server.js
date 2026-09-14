@@ -30,11 +30,14 @@ function readStorage() {
     }
     const raw = fs.readFileSync(STORAGE_FILE, 'utf8');
     const parsed = JSON.parse(raw);
+    const validSecrets = (Array.isArray(parsed.secrets) ? parsed.secrets : [])
+      .filter(s => s && typeof s === 'object' && typeof s.id === 'string' && typeof s.text === 'string' && s.text.trim().length > 0);
+
     return {
       presenceCount: typeof parsed.presenceCount === 'number' ? parsed.presenceCount : 0,
       presenceDevices: parsed.presenceDevices && typeof parsed.presenceDevices === 'object' ? parsed.presenceDevices : {},
       deviceSecretCounts: parsed.deviceSecretCounts && typeof parsed.deviceSecretCounts === 'object' ? parsed.deviceSecretCounts : {},
-      secrets: Array.isArray(parsed.secrets) ? parsed.secrets : []
+      secrets: validSecrets
     };
   } catch (err) {
     console.error('Error reading storage.json, using fallback:', err.message);
@@ -57,6 +60,7 @@ function writeStorage(data) {
 
 app.use(cors());
 app.use(express.json());
+app.get('/favicon.ico', (req, res) => res.status(204).end());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Helper to extract device ID
@@ -81,7 +85,8 @@ app.get('/api/presence', (req, res) => {
     count: data.presenceCount,
     hasLeftPresence,
     secretCount,
-    secretsRemaining
+    secretsRemaining,
+    totalSecrets: data.secrets.length
   });
 });
 

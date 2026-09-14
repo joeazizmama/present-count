@@ -1,8 +1,16 @@
 {
   "presenceCount": 1,
-  "presenceDevices": {},
-  "deviceSecretCounts": {},
+  "presenceDevices": {
+    "dev_mu18r9hm_rkkpkdud": "2026-09-14T14:02:50.198Z"
+  },
+  "deviceSecretCounts": {
+    "dev_mu18r9hm_rkkpkdud": 1
+  },
   "secrets": [
-    {}
+    {
+      "id": "sec_mu1bbvin_d8l2",
+      "text": "heloo",
+      "timestamp": "2026-09-14T14:02:56.207Z"
+    }
   ]
 }

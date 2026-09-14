@@ -233,22 +233,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch(`/api/presence?deviceId=${encodeURIComponent(deviceId)}`);
       if (res.ok) {
         const data = await res.json();
-        renderCount(data.count, false);
+        if (typeof data.count === 'number') {
+          renderCount(data.count, false);
+        }
         if (data.hasLeftPresence) {
           setPresenceRecordedUI(true);
         }
         if (typeof data.secretsRemaining === 'number') {
           updateSecretQuotaUI(data.secretsRemaining);
         }
+        if (voidStat && typeof data.totalSecrets === 'number') {
+          voidStat.textContent = data.totalSecrets === 1
+            ? '1 whisper held in silence'
+            : `${data.totalSecrets} whispers held in silence`;
+        }
       }
     } catch (err) {
       console.warn('Offline or initializing with fallback presence');
-      if (countDigits.textContent === '—') {
-        renderCount(128, false);
+      if (countDigits && countDigits.textContent === '—') {
+        renderCount(currentCount || 0, false);
       }
     }
   }
   fetchPresence();
+  // Poll for live presence & whispers updates
+  setInterval(fetchPresence, 10000);
 
   // --- Tactile Ripple Generator ---
   function createRipple(e) {
@@ -283,8 +292,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isUpdatingPresence) return;
     isUpdatingPresence = true;
 
+    const previousCount = currentCount;
     // Optimistic count increment
-    renderCount(currentCount + 1, true);
+    renderCount(previousCount + 1, true);
 
     try {
       const res = await fetch('/api/presence/increment', {
@@ -303,10 +313,17 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (res.status === 403) {
         // Already recorded
         setPresenceRecordedUI(true);
-        if (data.count) renderCount(data.count, false);
+        if (typeof data.count === 'number') {
+          renderCount(data.count, false);
+        } else {
+          renderCount(previousCount, false);
+        }
+      } else {
+        renderCount(previousCount, false);
       }
     } catch (err) {
-      console.error('Failed to persist presence:', err);
+      console.warn('Failed to persist presence:', err);
+      renderCount(previousCount, false);
     } finally {
       setTimeout(() => {
         isUpdatingPresence = false;
