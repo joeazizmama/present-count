@@ -291,6 +291,21 @@
       color: #9C5146;
     }
 
+    .action-icon-btn.delete-btn.is-confirming {
+      color: #A33A2E;
+      background: rgba(163, 58, 46, 0.08);
+      font-weight: 600;
+      border: 1px solid rgba(163, 58, 46, 0.28);
+      border-radius: 6px;
+      padding: 0.2rem 0.55rem;
+      animation: pulseDissolve 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulseDissolve {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(0.98); }
+    }
+
     .empty-state {
       padding: 4rem 2rem;
       text-align: center;
@@ -577,22 +592,67 @@
         });
 
         secretsFeed.querySelectorAll('.delete-btn').forEach(btn => {
-          btn.addEventListener('click', async () => {
+          let confirmTimeout = null;
+
+          btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
             const id = btn.dataset.id;
-            if (!confirm('Dissolve this whisper permanently from the void?')) return;
+
+            // FIRST PRESS: Request confirmation inline without any browser popup
+            if (!btn.classList.contains('is-confirming')) {
+              btn.classList.add('is-confirming');
+              btn.textContent = 'Confirm Dissolve?';
+
+              // Revert back after 3.5 seconds if not confirmed
+              confirmTimeout = setTimeout(() => {
+                btn.classList.remove('is-confirming');
+                btn.textContent = 'Dissolve';
+                confirmTimeout = null;
+              }, 3500);
+              return;
+            }
+
+            // SECOND PRESS: Dissolve the whisper directly
+            if (confirmTimeout) {
+              clearTimeout(confirmTimeout);
+              confirmTimeout = null;
+            }
+
+            btn.disabled = true;
+            btn.classList.remove('is-confirming');
+            btn.textContent = 'Dissolving...';
 
             try {
               const res = await fetch(`/api/vault/secrets/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${currentToken}` }
               });
+
               if (res.ok) {
-                loadedSecrets = loadedSecrets.filter(s => s && s.id !== id);
-                metricSecrets.textContent = loadedSecrets.length.toLocaleString();
-                renderFeed();
+                const card = document.getElementById(`card-${id}`);
+                if (card) {
+                  card.style.transition = 'all 0.3s ease';
+                  card.style.opacity = '0';
+                  card.style.transform = 'scale(0.96)';
+                  setTimeout(() => {
+                    loadedSecrets = loadedSecrets.filter(s => s && s.id !== id);
+                    metricSecrets.textContent = loadedSecrets.length.toLocaleString();
+                    renderFeed();
+                  }, 280);
+                } else {
+                  loadedSecrets = loadedSecrets.filter(s => s && s.id !== id);
+                  metricSecrets.textContent = loadedSecrets.length.toLocaleString();
+                  renderFeed();
+                }
+              } else {
+                btn.disabled = false;
+                btn.textContent = 'Failed';
+                setTimeout(() => { btn.textContent = 'Dissolve'; }, 2000);
               }
-            } catch (e) {
-              alert('Could not dissolve whisper.');
+            } catch (err) {
+              btn.disabled = false;
+              btn.textContent = 'Failed';
+              setTimeout(() => { btn.textContent = 'Dissolve'; }, 2000);
             }
           });
         });
