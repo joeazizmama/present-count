@@ -1,22 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
+const { kv } = require('@vercel/kv');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DATA_DIR = path.join(__dirname, 'data');
-const STORAGE_FILE = path.join(DATA_DIR, 'storage.json');
-
-// Ensure data directory exists and is accessible
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-if (fs.existsSync(STORAGE_FILE)) {
-  try {
-    fs.chmodSync(STORAGE_FILE, 0o666);
-  } catch (_) {}
-}
 
 // Initial storage seed
 const initialData = {
@@ -27,46 +15,28 @@ const initialData = {
   secrets: []
 };
 
-// Safe helper to read storage
-function readStorage() {
+// Safe helper to read storage from Vercel KV
+async function readStorage() {
   try {
-    if (!fs.existsSync(STORAGE_FILE)) {
-      fs.writeFileSync(STORAGE_FILE, JSON.stringify(initialData, null, 2), 'utf8');
+    const data = await kv.get('storage');
+    if (!data) {
       return { ...initialData };
     }
-    const raw = fs.readFileSync(STORAGE_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    const validSecrets = (Array.isArray(parsed.secrets) ? parsed.secrets : [])
-      .filter(s => s && typeof s === 'object' && typeof s.id === 'string' && typeof s.text === 'string' && s.text.trim().length > 0);
-
-    return {
-      presenceCount: typeof parsed.presenceCount === 'number' ? parsed.presenceCount : 0,
-      presenceDevices: parsed.presenceDevices && typeof parsed.presenceDevices === 'object' ? parsed.presenceDevices : {},
-      confirmedPresenceDevices: parsed.confirmedPresenceDevices && typeof parsed.confirmedPresenceDevices === 'object' ? parsed.confirmedPresenceDevices : {},
-      deviceSecretCounts: parsed.deviceSecretCounts && typeof parsed.deviceSecretCounts === 'object' ? parsed.deviceSecretCounts : {},
-      secrets: validSecrets
-    };
+    return data;
   } catch (err) {
-    console.error('Error reading storage.json, using fallback:', err.message);
+    console.error('Error reading storage from KV:', err.message);
     return { ...initialData };
   }
 }
 
-// Safe helper to write storage reliably across platforms (avoids Windows rename EPERM locking)
-function writeStorage(data) {
+// Safe helper to write storage to Vercel KV
+async function writeStorage(data) {
   try {
-    const json = JSON.stringify(data, null, 2);
-    fs.writeFileSync(STORAGE_FILE, json, { encoding: 'utf8', flag: 'w' });
+    await kv.set('storage', data);
     return true;
   } catch (err) {
-    try {
-      fs.chmodSync(STORAGE_FILE, 0o666);
-      fs.writeFileSync(STORAGE_FILE, JSON.stringify(data, null, 2), { encoding: 'utf8', flag: 'w' });
-      return true;
-    } catch (retryErr) {
-      console.error('Error writing storage.json:', retryErr.message);
-      return false;
-    }
+    console.error('Error writing storage to KV:', err.message);
+    return false;
   }
 }
 
@@ -85,14 +55,14 @@ function getDeviceId(req) {
 }
 
 // API: Get presence count and device status (counts each device that enters the website)
-app.get('/api/presence', (req, res) => {
-  const data = readStorage();
+app.get('/api/presence', async (req, res) => {
+  const data = await readStorage();
   const deviceId = getDeviceId(req);
 
   // Automatically count and record every device that enters the website
   if (deviceId && !data.presenceDevices[deviceId]) {
     data.presenceDevices[deviceId] = new Date().toISOString();
-    writeStorage(data);
+    await writeStorage(data);
   }
 
   const hasLeftPresence = deviceId ? Boolean(data.confirmedPresenceDevices[deviceId]) : false;
@@ -110,13 +80,13 @@ app.get('/api/presence', (req, res) => {
 });
 
 // API: Increment presence count (once per device when they click "I Was Here")
-app.post('/api/presence/increment', (req, res) => {
+app.post('/api/presence/increment', async (req, res) => {
   const deviceId = getDeviceId(req);
   if (!deviceId) {
     return res.status(400).json({ error: 'Device identifier required.' });
   }
 
-  const data = readStorage();
+  const data = await readStorage();
 
   // Ensure device is counted in presenceDevices
   if (!data.presenceDevices[deviceId]) {
@@ -133,7 +103,7 @@ app.post('/api/presence/increment', (req, res) => {
 
   data.confirmedPresenceDevices[deviceId] = new Date().toISOString();
   data.presenceCount += 1;
-  writeStorage(data);
+  await writeStorage(data);
 
   res.json({
     success: true,
@@ -143,7 +113,7 @@ app.post('/api/presence/increment', (req, res) => {
 });
 
 // API: Submit anonymous secret to the void (max 2 per device)
-app.post('/api/secrets', (req, res) => {
+app.post('/api/secrets', async (req, res) => {
   const deviceId = getDeviceId(req);
   if (!deviceId) {
     return res.status(400).json({ error: 'Device identifier required.' });
@@ -163,7 +133,7 @@ app.post('/api/secrets', (req, res) => {
     return res.status(400).json({ error: 'Secret cannot exceed 500 characters.' });
   }
 
-  const data = readStorage();
+  const data = await readStorage();
   const currentCount = data.deviceSecretCounts[deviceId] || 0;
 
   if (currentCount >= 2) {
@@ -185,7 +155,7 @@ app.post('/api/secrets', (req, res) => {
   };
 
   data.secrets.push(newSecret);
-  writeStorage(data);
+  await writeStorage(data);
 
   res.json({
     success: true,
@@ -224,12 +194,12 @@ app.post('/api/vault/auth', (req, res) => {
 });
 
 // Vault Secrets List API (Protected)
-app.get('/api/vault/secrets', (req, res) => {
+app.get('/api/vault/secrets', async (req, res) => {
   if (!verifyVaultAuth(req)) {
     return res.status(401).json({ error: 'Unauthorized access to the void vault.' });
   }
 
-  const data = readStorage();
+  const data = await readStorage();
   res.json({
     success: true,
     presenceCount: data.presenceCount,
@@ -240,18 +210,18 @@ app.get('/api/vault/secrets', (req, res) => {
 });
 
 // Vault Delete Secret API (Protected)
-app.delete('/api/vault/secrets/:id', (req, res) => {
+app.delete('/api/vault/secrets/:id', async (req, res) => {
   if (!verifyVaultAuth(req)) {
     return res.status(401).json({ error: 'Unauthorized.' });
   }
 
   const { id } = req.params;
-  const data = readStorage();
+  const data = await readStorage();
   const initialLength = data.secrets.length;
   data.secrets = data.secrets.filter(s => s.id !== id);
 
   if (data.secrets.length !== initialLength) {
-    writeStorage(data);
+    await writeStorage(data);
     return res.json({ success: true, message: 'Whisper dissolved.' });
   }
   return res.status(404).json({ error: 'Secret not found.' });
@@ -276,4 +246,3 @@ app.listen(PORT, () => {
   console.log(`✨ Presence & Void server running gracefully at http://localhost:${PORT}`);
   console.log(`🗝️  Void Vault accessible at http://localhost:${PORT}/void-vault`);
 });
-
