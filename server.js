@@ -17,6 +17,7 @@ if (!fs.existsSync(DATA_DIR)) {
 const initialData = {
   presenceCount: 128,
   presenceDevices: {},
+  confirmedPresenceDevices: {},
   deviceSecretCounts: {},
   secrets: []
 };
@@ -36,6 +37,7 @@ function readStorage() {
     return {
       presenceCount: typeof parsed.presenceCount === 'number' ? parsed.presenceCount : 0,
       presenceDevices: parsed.presenceDevices && typeof parsed.presenceDevices === 'object' ? parsed.presenceDevices : {},
+      confirmedPresenceDevices: parsed.confirmedPresenceDevices && typeof parsed.confirmedPresenceDevices === 'object' ? parsed.confirmedPresenceDevices : {},
       deviceSecretCounts: parsed.deviceSecretCounts && typeof parsed.deviceSecretCounts === 'object' ? parsed.deviceSecretCounts : {},
       secrets: validSecrets
     };
@@ -72,12 +74,18 @@ function getDeviceId(req) {
   return (typeof id === 'string' && id.trim().length > 0) ? id.trim() : null;
 }
 
-// API: Get presence count and device status
+// API: Get presence count and device status (counts each device that enters the website)
 app.get('/api/presence', (req, res) => {
   const data = readStorage();
   const deviceId = getDeviceId(req);
 
-  const hasLeftPresence = deviceId ? Boolean(data.presenceDevices[deviceId]) : false;
+  // Automatically count and record every device that enters the website
+  if (deviceId && !data.presenceDevices[deviceId]) {
+    data.presenceDevices[deviceId] = new Date().toISOString();
+    writeStorage(data);
+  }
+
+  const hasLeftPresence = deviceId ? Boolean(data.confirmedPresenceDevices[deviceId]) : false;
   const secretCount = deviceId ? (data.deviceSecretCounts[deviceId] || 0) : 0;
   const secretsRemaining = Math.max(0, 2 - secretCount);
 
@@ -86,11 +94,12 @@ app.get('/api/presence', (req, res) => {
     hasLeftPresence,
     secretCount,
     secretsRemaining,
-    totalSecrets: data.secrets.length
+    totalSecrets: data.secrets.length,
+    totalDevices: Object.keys(data.presenceDevices || {}).length
   });
 });
 
-// API: Increment presence count (once per device)
+// API: Increment presence count (once per device when they click "I Was Here")
 app.post('/api/presence/increment', (req, res) => {
   const deviceId = getDeviceId(req);
   if (!deviceId) {
@@ -99,7 +108,12 @@ app.post('/api/presence/increment', (req, res) => {
 
   const data = readStorage();
 
-  if (data.presenceDevices[deviceId]) {
+  // Ensure device is counted in presenceDevices
+  if (!data.presenceDevices[deviceId]) {
+    data.presenceDevices[deviceId] = new Date().toISOString();
+  }
+
+  if (data.confirmedPresenceDevices[deviceId]) {
     return res.status(403).json({
       error: 'Presence has already been recorded for this device.',
       hasLeftPresence: true,
@@ -107,7 +121,7 @@ app.post('/api/presence/increment', (req, res) => {
     });
   }
 
-  data.presenceDevices[deviceId] = new Date().toISOString();
+  data.confirmedPresenceDevices[deviceId] = new Date().toISOString();
   data.presenceCount += 1;
   writeStorage(data);
 

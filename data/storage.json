@@ -1,10 +1,11 @@
 {
   "presenceCount": 1,
   "presenceDevices": {
-    "dev_mu18r9hm_rkkpkdud": "2026-09-14T14:02:50.198Z"
+    "dev_mu18r9hm_rkkpkdud": "2026-09-14T14:14:19.495Z"
   },
-  "deviceSecretCounts": {
-    "dev_mu18r9hm_rkkpkdud": 2
+  "confirmedPresenceDevices": {
+    "dev_mu18r9hm_rkkpkdud": "2026-09-14T14:14:19.495Z"
   },
+  "deviceSecretCounts": {},
   "secrets": []
 }
