@@ -2,28 +2,45 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Start Presence App (Server + Browser)",
             "type": "node",
             "request": "launch",
-            "name": "Launch Server",
+            "program": "${workspaceFolder}/server.js",
+            "restart": true,
+            "outputCapture": "std",
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/server.js"
+            "serverReadyAction": {
+                "pattern": "http://localhost:([0-9]+)",
+                "uriFormat": "http://localhost:%s",
+                "action": "openExternally"
+            }
         },
         {
-            "type": "chrome",
+            "name": "Start Presence App (Debug with Chrome)",
+            "type": "node",
             "request": "launch",
-            "name": "Launch Chrome against localhost",
-            "url": "http://localhost:3000",
-            "webRoot": "${workspaceFolder}/public"
-        }
-    ],
-    "compounds": [
+            "program": "${workspaceFolder}/server.js",
+            "outputCapture": "std",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "serverReadyAction": {
+                "pattern": "http://localhost:([0-9]+)",
+                "uriFormat": "http://localhost:%s",
+                "action": "debugWithChrome",
+                "webRoot": "${workspaceFolder}/public"
+            }
+        },
         {
-            "name": "Full Stack (Server + Chrome)",
-            "configurations": [
-                "Launch Server",
-                "Launch Chrome against localhost"
+            "name": "Run Server Only",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/server.js",
+            "console": "integratedTerminal",
+            "skipFiles": [
+                "<node_internals>/**"
             ]
         }
     ]
